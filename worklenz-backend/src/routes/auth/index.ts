@@ -60,7 +60,7 @@ authRouter.get("/google/verify", (req, res) => {
 authRouter.post("/google/mobile", AuthController.googleMobileAuthPassport);
 
 // Discord authentication
-authRouter.get("/discord", (req, res) => {
+authRouter.get("/discord", (req, res, next) => {
   const state = JSON.stringify({
     teamMember: req.query.teamMember || null,
     team: req.query.team || null,
@@ -68,10 +68,10 @@ authRouter.get("/discord", (req, res) => {
     project: req.query.project || null
   });
 
-  return passport.authenticate("discord", { state })(req, res);
+  return passport.authenticate("discord", { state })(req, res, next);
 });
 
-authRouter.get("/discord/verify", (req, res) => {
+authRouter.get("/discord/verify", (req, res, next) => {
   let error = "";
   if ((req.session as any).error) {
     error = `?error=${encodeURIComponent((req.session as any).error as string)}`;
@@ -82,7 +82,7 @@ authRouter.get("/discord/verify", (req, res) => {
   return passport.authenticate("discord", {
     failureRedirect,
     successRedirect: process.env.LOGIN_SUCCESS_REDIRECT
-  })(req, res);
+  })(req, res, next);
 });
 
 // Passport logout

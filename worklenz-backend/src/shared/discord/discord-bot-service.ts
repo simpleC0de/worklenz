@@ -17,7 +17,8 @@ export class DiscordBotService {
 
   /**
    * Initialize Discord bot client and authenticate with Discord API
-   * Establishes WebSocket connection and event handlers
+   * Establishes WebSocket connection and waits for bot to be ready
+   * Uses Promise.race to enforce 30-second timeout on connection
    *
    * @throws {Error} If bot token is missing or authentication fails
    * @returns {Promise<void>}
@@ -47,14 +48,23 @@ export class DiscordBotService {
         this.handleReconnect();
       });
 
-      // Handle successful connection
-      this.client.on('ready', () => {
-        console.log(`[Discord Bot] Connected as ${this.client!.user?.tag}`);
-        this.initialized = true;
-        this.reconnectAttempts = 0;
-      });
+      // Create Promise that resolves when bot is ready
+      const readyPromise = Promise.race([
+        new Promise<void>((resolve) => {
+          this.client!.once('ready', () => {
+            console.log(`[Discord Bot] Connected as ${this.client!.user?.tag}`);
+            this.initialized = true;
+            this.reconnectAttempts = 0;
+            resolve();
+          });
+        }),
+        new Promise<void>((_, reject) => {
+          setTimeout(() => reject(new Error('Discord bot connection timeout (30s)')), 30000);
+        })
+      ]);
 
       await this.client.login(botToken);
+      await readyPromise; // Wait for 'ready' event before returning
     } catch (error: any) {
       log_error(error);
       throw new Error(`Discord bot initialization failed: ${error?.message || 'Unknown error'}`);

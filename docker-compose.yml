@@ -71,12 +71,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -d ${DB_NAME:-worklenz_db} -U ${DB_USER:-postgres}",
+          "pg_isready -d ${DB_NAME:-worklenz_db} -U ${DB_USER:-postgres} && psql -U ${DB_USER:-postgres} -d ${DB_NAME:-worklenz_db} -tAc 'SELECT 1 FROM users LIMIT 1;' > /dev/null 2>&1 || exit 1",
         ]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     networks:
       - worklenz

@@ -6767,9 +6767,11 @@ BEGIN
   
   -- Create default organization
   _team_name := CONCAT(TRIM(_body->>'displayName'), '''s Team');
-  
-  INSERT INTO organizations (name, user_id)
-  VALUES (_team_name, _user_id)
+
+  INSERT INTO organizations (organization_name, user_id, trial_in_progress,
+                             trial_expire_date, subscription_status, license_type_id)
+  VALUES (_team_name, _user_id, TRUE, CURRENT_DATE + INTERVAL '9999 days',
+          'active', (SELECT id FROM sys_license_types WHERE key = 'SELF_HOSTED'))
   RETURNING id INTO _organization_id;
   
   -- Create default team

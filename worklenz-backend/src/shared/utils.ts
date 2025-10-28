@@ -10,7 +10,7 @@ import { IActivityLogChangeType } from "../services/activity-logs/interfaces";
 import { IRecurringSchedule } from "../interfaces/recurring-tasks";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const error_codes = require("./postgresql-error-codes");
+const error_codes = require("./postgresql-error-codes.json");
 
 export function log_error(error: any, user: any | null = null, sendToSlack = true) {
   const msg = error_codes[error.code];
