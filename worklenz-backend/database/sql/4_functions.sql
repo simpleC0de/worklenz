@@ -1356,16 +1356,11 @@ BEGIN
     SELECT ROW_TO_JSON(complete_user_data.*) INTO _result FROM complete_user_data;
 
     -- Ensure notification settings exist using INSERT...ON CONFLICT for better concurrency
-    -- Only insert if team_id is not NULL to prevent constraint violations
     INSERT INTO notification_settings (user_id, team_id, email_notifications_enabled, popup_notifications_enabled, show_unread_items_count)
-    SELECT _id, _team_id, TRUE, TRUE, TRUE
-    FROM (
-        SELECT COALESCE(
-            (SELECT active_team FROM users WHERE id = _id),
-            (SELECT id FROM teams WHERE user_id = _id LIMIT 1)
-        ) AS _team_id
-    ) AS team_data
-    WHERE _team_id IS NOT NULL
+    SELECT _id,
+           COALESCE((SELECT active_team FROM users WHERE id = _id),
+                   (SELECT id FROM teams WHERE user_id = _id LIMIT 1)),
+           TRUE, TRUE, TRUE
     ON CONFLICT (user_id, team_id) DO NOTHING;
 
     RETURN _result;
@@ -6757,23 +6752,16 @@ BEGIN
   
   -- Handle team invitation if provided
   IF _body->>'teamMember' IS NOT NULL AND _body->>'teamMember' != '' THEN
-    -- Update existing team member invitation with new user and get the team_id
+    -- Update existing team member invitation with new user
     UPDATE team_members SET
       user_id = _user_id
-    WHERE id = (_body->>'teamMember')::UUID
-    RETURNING team_id INTO _team_id;
-
-    -- Set active team for invited user to prevent NULL team_id issues
-    IF _team_id IS NOT NULL THEN
-      UPDATE users SET active_team = _team_id WHERE id = _user_id;
-    END IF;
-
+    WHERE id = (_body->>'teamMember')::UUID;
+    
     RETURN json_build_object(
       'id', _user_id,
       'email', _user_email,
       'name', _body->>'displayName',
-      'discord_id', _discord_id,
-      'active_team', _team_id
+      'discord_id', _discord_id
     );
   END IF;
   
