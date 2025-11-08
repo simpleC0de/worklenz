@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery } from 'react-responsive';
-import { LockOutlined, MailOutlined, UserOutlined } from '@/shared/antd-imports';
+import { LockOutlined, MailOutlined, UserOutlined, IdcardOutlined } from '@/shared/antd-imports';
 import { Form, Card, Input, Flex, Button, Typography, Space, message } from 'antd/es';
 import { Rule } from 'antd/es/form';
 import { CheckCircleTwoTone, CloseCircleTwoTone } from '@/shared/antd-imports';
@@ -220,6 +220,7 @@ const SignupPage = () => {
         name: values.name,
         email: values.email.toLowerCase().trim(),
         password: values.password,
+        discord_id: values.discord_id,
       };
 
       const res = await authApiService.signUpCheck(body);
@@ -302,6 +303,16 @@ const SignupPage = () => {
         required: true,
         type: 'email',
         message: t('emailRequired'),
+      },
+    ],
+    discord_id: [
+      {
+        required: urlParams.teamMemberId ? true : false,
+        message: t('discordIdRequired', {defaultValue: 'Discord ID is required'}),
+      },
+      {
+        pattern: /^\d{17,19}$/,
+        message: t('discordIdPattern', {defaultValue: 'Discord ID must be 17-19 digits'}),
       },
     ],
     password: [
@@ -400,6 +411,22 @@ const SignupPage = () => {
             style={{ borderRadius: 4 }}
           />
         </Form.Item>
+
+        {urlParams.teamMemberId && (
+          <Form.Item
+            name="discord_id"
+            label={t('discordIdLabel', {defaultValue: 'Discord User ID'})}
+            rules={formRules.discord_id as Rule[]}
+            tooltip={t('discordIdTooltip', {defaultValue: 'Your Discord User ID (17-19 digits). Right-click your name in Discord and select "Copy User ID"'})}
+          >
+            <Input
+              prefix={<IdcardOutlined />}
+              placeholder={t('discordIdPlaceholder', {defaultValue: 'Enter your Discord User ID'})}
+              size="large"
+              style={{ borderRadius: 4 }}
+            />
+          </Form.Item>
+        )}
 
         <Form.Item
           name="password"

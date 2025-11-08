@@ -5010,11 +5010,12 @@ BEGIN
         RAISE 'EMAIL_EXISTS_ERROR:%', (_body ->> 'email');
     END IF;
 
-    -- insert user
-    INSERT INTO users (name, email, password, timezone_id)
+    -- insert user with discord_id
+    INSERT INTO users (name, email, password, timezone_id, discord_id)
     VALUES (_trimmed_name, _trimmed_email, (_body ->> 'password'),
             COALESCE((SELECT id FROM timezones WHERE name = (_body ->> 'timezone')),
-                     (SELECT id FROM timezones WHERE name = 'UTC')))
+                     (SELECT id FROM timezones WHERE name = 'UTC')),
+            (_body ->> 'discord_id'))
     RETURNING id INTO _user_id;
 
     --insert organization data
