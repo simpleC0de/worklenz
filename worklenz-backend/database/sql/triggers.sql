@@ -73,9 +73,10 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS insert_notification_settings ON team_members;
 CREATE TRIGGER insert_notification_settings
-    AFTER INSERT
+    AFTER INSERT OR UPDATE OF user_id
     ON team_members
     FOR EACH ROW
+    WHEN (NEW.user_id IS NOT NULL)
 EXECUTE FUNCTION notification_settings_insert_trigger_fn();
 -- Insert notification settings for new team members
 
