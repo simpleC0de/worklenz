@@ -146,9 +146,34 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // CSRF token refresh endpoint
 app.get("/csrf-token", (req: Request, res: Response) => {
   try {
+    // Check session status before generating token
+    if (!req.session) {
+      console.error("[CSRF-TOKEN] Session not initialized:", {
+        path: req.path,
+        method: req.method,
+        sessionID: req.sessionID,
+        cookies: req.headers.cookie ? "present" : "missing",
+        headers: {
+          "x-session-id": req.headers["x-session-id"] || "not set",
+          "x-session-name": req.headers["x-session-name"] || "not set"
+        }
+      });
+      return res.status(500).json({ done: false, message: "Failed to generate CSRF token" });
+    }
+
     const token = generateToken(req);
     res.status(200).json({ done: true, message: "CSRF token refreshed", token });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[CSRF-TOKEN] Error generating CSRF token:", {
+      error: error.message,
+      stack: error.stack,
+      path: req.path,
+      method: req.method,
+      sessionID: req.sessionID,
+      sessionExists: !!req.session,
+      isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : "N/A",
+      cookies: req.headers.cookie ? "present" : "missing"
+    });
     res.status(500).json({ done: false, message: "Failed to generate CSRF token" });
   }
 });
@@ -216,8 +241,29 @@ app.get("*", (req: Request, res: Response, next: NextFunction) => {
 });
 
 // Global error handler
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || 500;
+
+  // ALWAYS log errors server-side (even in production)
+  console.error("[GLOBAL-ERROR-HANDLER] Error caught:", {
+    error: err.message,
+    stack: err.stack,
+    status,
+    path: req.path,
+    method: req.method,
+    query: req.query,
+    body: req.body && Object.keys(req.body).length > 0 ? Object.keys(req.body) : "empty",
+    sessionID: req.sessionID,
+    sessionExists: !!req.session,
+    isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : "N/A",
+    cookies: req.headers.cookie ? "present" : "missing",
+    headers: {
+      "user-agent": req.headers["user-agent"],
+      "referer": req.headers["referer"],
+      "x-session-id": req.headers["x-session-id"] || "not set",
+      "x-session-name": req.headers["x-session-name"] || "not set"
+    }
+  });
 
   if (res.headersSent) {
     return;
@@ -225,7 +271,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
   res.status(status);
 
-  // Send structured error response
+  // Send structured error response (hide sensitive details in production)
   res.json({
     done: false,
     message: isProduction() ? "Internal Server Error" : err.message,

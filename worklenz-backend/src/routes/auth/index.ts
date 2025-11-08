@@ -31,29 +31,68 @@ authRouter.post("/verify-captcha", safeControllerFunction(AuthController.verifyC
 
 // Google authentication
 authRouter.get("/google", (req, res) => {
-  return passport.authenticate("google", {
-    scope: ["email", "profile"],
-    state: JSON.stringify({
-      teamMember: req.query.teamMember || null,
-      team: req.query.team || null,
-      teamName: req.query.teamName || null,
-      project: req.query.project || null
-    })
-  })(req, res);
+  try {
+    // Validate Google configuration
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error("[GOOGLE-AUTH] Google OAuth not configured:", {
+        hasClientId: !!process.env.GOOGLE_CLIENT_ID,
+        hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET
+      });
+      return res.status(500).json({ done: false, message: "Google authentication not available" });
+    }
+
+    return passport.authenticate("google", {
+      scope: ["email", "profile"],
+      state: JSON.stringify({
+        teamMember: req.query.teamMember || null,
+        team: req.query.team || null,
+        teamName: req.query.teamName || null,
+        project: req.query.project || null
+      })
+    })(req, res);
+  } catch (error: any) {
+    console.error("[GOOGLE-AUTH] Error initiating Google authentication:", {
+      error: error.message,
+      stack: error.stack,
+      path: req.path,
+      query: req.query
+    });
+    return res.status(500).json({ done: false, message: "Google authentication failed" });
+  }
 });
 
 authRouter.get("/google/verify", (req, res) => {
-  let error = "";
-  if ((req.session as any).error) {
-    error = `?error=${encodeURIComponent((req.session as any).error as string)}`;
-    delete (req.session as any).error;
-  }
+  try {
+    // Validate redirect URLs
+    if (!process.env.LOGIN_FAILURE_REDIRECT || !process.env.LOGIN_SUCCESS_REDIRECT) {
+      console.error("[GOOGLE-VERIFY] Redirect URLs not configured:", {
+        hasFailureRedirect: !!process.env.LOGIN_FAILURE_REDIRECT,
+        hasSuccessRedirect: !!process.env.LOGIN_SUCCESS_REDIRECT
+      });
+      return res.status(500).json({ done: false, message: "OAuth redirect configuration missing" });
+    }
 
-  const failureRedirect = process.env.LOGIN_FAILURE_REDIRECT + error;
-  return passport.authenticate("google", {
-    failureRedirect,
-    successRedirect: process.env.LOGIN_SUCCESS_REDIRECT
-  })(req, res);
+    let error = "";
+    if ((req.session as any).error) {
+      error = `?error=${encodeURIComponent((req.session as any).error as string)}`;
+      delete (req.session as any).error;
+    }
+
+    const failureRedirect = process.env.LOGIN_FAILURE_REDIRECT + error;
+    return passport.authenticate("google", {
+      failureRedirect,
+      successRedirect: process.env.LOGIN_SUCCESS_REDIRECT
+    })(req, res);
+  } catch (error: any) {
+    console.error("[GOOGLE-VERIFY] Error during Google callback:", {
+      error: error.message,
+      stack: error.stack,
+      path: req.path,
+      query: req.query,
+      sessionExists: !!req.session
+    });
+    return res.status(500).json({ done: false, message: "Google authentication callback failed" });
+  }
 });
 
 // Mobile Google Sign-In using Passport strategy
@@ -61,28 +100,68 @@ authRouter.post("/google/mobile", AuthController.googleMobileAuthPassport);
 
 // Discord authentication
 authRouter.get("/discord", (req, res, next) => {
-  const state = JSON.stringify({
-    teamMember: req.query.teamMember || null,
-    team: req.query.team || null,
-    teamName: req.query.teamName || null,
-    project: req.query.project || null
-  });
+  try {
+    // Validate Discord configuration
+    if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET) {
+      console.error("[DISCORD-AUTH] Discord OAuth not configured:", {
+        hasClientId: !!process.env.DISCORD_CLIENT_ID,
+        hasClientSecret: !!process.env.DISCORD_CLIENT_SECRET,
+        hasCallbackUrl: !!process.env.DISCORD_CALLBACK_URL
+      });
+      return res.status(500).json({ done: false, message: "Discord authentication not available" });
+    }
 
-  return passport.authenticate("discord", { state })(req, res, next);
+    const state = JSON.stringify({
+      teamMember: req.query.teamMember || null,
+      team: req.query.team || null,
+      teamName: req.query.teamName || null,
+      project: req.query.project || null
+    });
+
+    return passport.authenticate("discord", { state })(req, res, next);
+  } catch (error: any) {
+    console.error("[DISCORD-AUTH] Error initiating Discord authentication:", {
+      error: error.message,
+      stack: error.stack,
+      path: req.path,
+      query: req.query
+    });
+    return res.status(500).json({ done: false, message: "Discord authentication failed" });
+  }
 });
 
 authRouter.get("/discord/verify", (req, res, next) => {
-  let error = "";
-  if ((req.session as any).error) {
-    error = `?error=${encodeURIComponent((req.session as any).error as string)}`;
-    delete (req.session as any).error;
-  }
+  try {
+    // Validate redirect URLs
+    if (!process.env.LOGIN_FAILURE_REDIRECT || !process.env.LOGIN_SUCCESS_REDIRECT) {
+      console.error("[DISCORD-VERIFY] Redirect URLs not configured:", {
+        hasFailureRedirect: !!process.env.LOGIN_FAILURE_REDIRECT,
+        hasSuccessRedirect: !!process.env.LOGIN_SUCCESS_REDIRECT
+      });
+      return res.status(500).json({ done: false, message: "OAuth redirect configuration missing" });
+    }
 
-  const failureRedirect = process.env.LOGIN_FAILURE_REDIRECT + error;
-  return passport.authenticate("discord", {
-    failureRedirect,
-    successRedirect: process.env.LOGIN_SUCCESS_REDIRECT
-  })(req, res, next);
+    let error = "";
+    if ((req.session as any).error) {
+      error = `?error=${encodeURIComponent((req.session as any).error as string)}`;
+      delete (req.session as any).error;
+    }
+
+    const failureRedirect = process.env.LOGIN_FAILURE_REDIRECT + error;
+    return passport.authenticate("discord", {
+      failureRedirect,
+      successRedirect: process.env.LOGIN_SUCCESS_REDIRECT
+    })(req, res, next);
+  } catch (error: any) {
+    console.error("[DISCORD-VERIFY] Error during Discord callback:", {
+      error: error.message,
+      stack: error.stack,
+      path: req.path,
+      query: req.query,
+      sessionExists: !!req.session
+    });
+    return res.status(500).json({ done: false, message: "Discord authentication callback failed" });
+  }
 });
 
 // Passport logout

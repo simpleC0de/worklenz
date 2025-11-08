@@ -30,30 +30,64 @@ export default class AuthController extends WorklenzControllerBase {
   }
 
   public static verify(req: IWorkLenzRequest, res: IWorkLenzResponse) {
-    // Flash messages sent from passport-local-signup.ts and passport-local-login.ts
-    const errors = req.flash()["error"] || [];
-    const messages = req.flash()["success"] || [];
-    // If there are multiple messages, we will send one at a time.
-    const auth_error = errors.length > 0 ? errors[0] : null;
-    const message = messages.length > 0 ? messages[0] : null;
-
-    // Determine title based on authentication status and strategy
-    let title = null;
-    if (req.query.strategy) {
-      if (auth_error) {
-        // Show failure title only when there's an actual error
-        title = req.query.strategy === "login" ? "Login Failed!" : "Signup Failed!";
-      } else if (req.isAuthenticated() && message) {
-        // Show success title when authenticated and there's a success message
-        title = req.query.strategy === "login" ? "Login Successful!" : "Signup Successful!";
+    try {
+      // Check session and flash availability
+      if (!req.session) {
+        console.error("[AUTH-VERIFY] Session not initialized:", {
+          path: req.path,
+          method: req.method,
+          sessionID: req.sessionID,
+          cookies: req.headers.cookie ? "present" : "missing",
+          query: req.query
+        });
+        return res.status(500).send(new AuthResponse(null, false, null, "Session initialization failed", null));
       }
-      // If no error and not authenticated, don't show any title (this might be a redirect without completion)
+
+      if (!req.flash) {
+        console.error("[AUTH-VERIFY] Flash not available:", {
+          path: req.path,
+          sessionID: req.sessionID
+        });
+        return res.status(500).send(new AuthResponse(null, false, null, "Flash messages not available", null));
+      }
+
+      // Flash messages sent from passport-local-signup.ts and passport-local-login.ts
+      const errors = req.flash()["error"] || [];
+      const messages = req.flash()["success"] || [];
+      // If there are multiple messages, we will send one at a time.
+      const auth_error = errors.length > 0 ? errors[0] : null;
+      const message = messages.length > 0 ? messages[0] : null;
+
+      // Determine title based on authentication status and strategy
+      let title = null;
+      if (req.query.strategy) {
+        if (auth_error) {
+          // Show failure title only when there's an actual error
+          title = req.query.strategy === "login" ? "Login Failed!" : "Signup Failed!";
+        } else if (req.isAuthenticated() && message) {
+          // Show success title when authenticated and there's a success message
+          title = req.query.strategy === "login" ? "Login Successful!" : "Signup Successful!";
+        }
+        // If no error and not authenticated, don't show any title (this might be a redirect without completion)
+      }
+
+      if (req.user)
+        req.user.build_v = FileConstants.getRelease();
+
+      return res.status(200).send(new AuthResponse(title, req.isAuthenticated(), req.user || null, auth_error, message));
+    } catch (error: any) {
+      console.error("[AUTH-VERIFY] Error during verification:", {
+        error: error.message,
+        stack: error.stack,
+        path: req.path,
+        method: req.method,
+        sessionID: req.sessionID,
+        sessionExists: !!req.session,
+        isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : "N/A",
+        query: req.query
+      });
+      return res.status(500).send(new AuthResponse(null, false, null, "Verification failed", null));
     }
-
-    if (req.user)
-      req.user.build_v = FileConstants.getRelease();
-
-    return res.status(200).send(new AuthResponse(title, req.isAuthenticated(), req.user || null, auth_error, message));
   }
 
   public static logout(req: IWorkLenzRequest, res: IWorkLenzResponse) {
