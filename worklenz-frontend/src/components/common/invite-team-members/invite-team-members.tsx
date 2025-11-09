@@ -17,7 +17,7 @@ interface FormValues {
   email: string[];
   jobTitle: string;
   access: 'member' | 'admin';
-  discordId?: string;
+  discordId: string;
 }
 
 const InviteTeamMembers = () => {
@@ -63,7 +63,7 @@ const InviteTeamMembers = () => {
         job_title: selectedJobTitle,
         emails: emails,
         is_admin: values.access === 'admin',
-        discord_id: values.discordId || undefined,
+        discord_id: values.discordId,
       };
       const res = await teamMembersApiService.createTeamMember(body);
       if (res.done) {
@@ -190,10 +190,14 @@ const InviteTeamMembers = () => {
         </Form.Item>
 
         <Form.Item
-          label="Discord User ID (Optional)"
+          label="Discord User ID"
           name="discordId"
-          tooltip="The Discord User ID of the person you're inviting. If provided, they must use this exact Discord ID during signup."
+          tooltip="The Discord User ID of the person you're inviting. They must use this exact Discord ID during signup."
           rules={[
+            {
+              required: true,
+              message: 'Discord ID is required',
+            },
             {
               pattern: /^\d{17,19}$/,
               message: 'Discord ID must be 17-19 digits',
@@ -208,7 +212,7 @@ const InviteTeamMembers = () => {
         </Form.Item>
 
         <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: -16 }}>
-          Providing a Discord ID will enforce that the invited user must register with this exact Discord account.
+          Discord ID is required for all team invitations. Right-click a user's name in Discord and select "Copy User ID" to get their ID.
         </Typography.Text>
       </Form>
     </Modal>

@@ -1187,26 +1187,28 @@ BEGIN
         _job_title_id = NULL;
     END IF;
 
-    -- Validate Discord ID if provided
-    IF _discord_id IS NOT NULL
+    -- Discord ID is required for all invitations
+    IF _discord_id IS NULL OR _discord_id = ''
     THEN
-        -- Check format (17-19 digits)
-        IF NOT (_discord_id ~ '^\d{17,19}$')
-        THEN
-            RAISE 'ERROR_INVALID_DISCORD_ID_FORMAT:%', _discord_id;
-        END IF;
+        RAISE 'ERROR_DISCORD_ID_REQUIRED';
+    END IF;
 
-        -- Check if Discord ID already exists in users table
-        IF EXISTS(SELECT 1 FROM users WHERE discord_id = _discord_id)
-        THEN
-            RAISE 'ERROR_DISCORD_ID_ALREADY_EXISTS:%', _discord_id;
-        END IF;
+    -- Validate Discord ID format (17-19 digits)
+    IF NOT (_discord_id ~ '^\d{17,19}$')
+    THEN
+        RAISE 'ERROR_INVALID_DISCORD_ID_FORMAT:%', _discord_id;
+    END IF;
 
-        -- Check if Discord ID is already in pending invitations (different team)
-        IF EXISTS(SELECT 1 FROM email_invitations WHERE discord_id = _discord_id AND team_id != _team_id)
-        THEN
-            RAISE 'ERROR_DISCORD_ID_PENDING_INVITATION:%', _discord_id;
-        END IF;
+    -- Check if Discord ID already exists in users table
+    IF EXISTS(SELECT 1 FROM users WHERE discord_id = _discord_id)
+    THEN
+        RAISE 'ERROR_DISCORD_ID_ALREADY_EXISTS:%', _discord_id;
+    END IF;
+
+    -- Check if Discord ID is already in pending invitations (different team)
+    IF EXISTS(SELECT 1 FROM email_invitations WHERE discord_id = _discord_id AND team_id != _team_id)
+    THEN
+        RAISE 'ERROR_DISCORD_ID_PENDING_INVITATION:%', _discord_id;
     END IF;
 
     CREATE TEMPORARY TABLE temp_new_team_members (

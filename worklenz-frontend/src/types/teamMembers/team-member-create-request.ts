@@ -4,5 +4,5 @@ export interface ITeamMemberCreateRequest extends ITeamMember {
   job_title?: string | null;
   emails?: string | string[];
   is_admin?: boolean;
-  discord_id?: string;
+  discord_id: string;
 }
