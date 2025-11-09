@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   frontend:
     build:
@@ -36,30 +38,51 @@ services:
     image: minio/minio:latest
     container_name: worklenz_minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY}
+      # Removed MINIO_DOMAIN and MINIO_SERVER_URL for path-style access
     volumes:
       - worklenz_minio_data:/data
     command: server /data --console-address ":9001"
     networks:
       - worklenz
 
-  # MinIO setup helper - creates default bucket on startup
   createbuckets:
-    image: minio/mc
+    image: minio/mc:latest
     container_name: worklenz_createbuckets
     depends_on:
       - minio
     restart: on-failure
-    entrypoint: ["/bin/sh", "/scripts/createbuckets-entrypoint.sh"]
-    volumes:
-      - ./docker/createbuckets-entrypoint.sh:/scripts/createbuckets-entrypoint.sh:ro
+    entrypoint: |
+      /bin/sh -c "
+      set -e
+      echo '[Create Buckets] Waiting for MinIO API...'
+      until mc alias set myminio http://minio:9000 ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY} > /dev/null 2>&1; do
+        echo -n '.'
+        sleep 2
+      done
+      echo
+      echo '[Create Buckets] MinIO is ready. Alias ''myminio'' is set.'
+      BUCKET_NAME=worklenz
+      echo \"[Create Buckets] Checking for bucket: \$${BUCKET_NAME}\"
+      if mc ls myminio/\$${BUCKET_NAME} > /dev/null 2>&1; then
+        echo \"[Create Buckets] Bucket '\$${BUCKET_NAME}' already exists.\"
+      else
+        echo \"[Create Buckets] Bucket '\$${BUCKET_NAME}' not found, creating it...\"
+        mc mb myminio/\$${BUCKET_NAME}
+        echo \"[Create Buckets] Bucket '\$${BUCKET_NAME}' created.\"
+        mc policy set download myminio/\$${BUCKET_NAME}
+        echo \"[Create Buckets] Policy for '\$${BUCKET_NAME}' set to download.\"
+      fi
+      echo '[Create Buckets] Setup finished successfully.'
+      "
     networks:
       - worklenz
+
   db:
     image: postgres:15
     container_name: worklenz_db
@@ -69,10 +92,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "pg_isready -d ${DB_NAME:-worklenz_db} -U ${DB_USER:-postgres} && psql -U ${DB_USER:-postgres} -d ${DB_NAME:-worklenz_db} -tAc 'SELECT 1 FROM users LIMIT 1;' > /dev/null 2>&1 || exit 1",
-        ]
+        ["CMD-SHELL", "pg_isready -d ${DB_NAME:-worklenz_db} -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -82,23 +102,7 @@ services:
       - worklenz
     volumes:
       - worklenz_postgres_data:/var/lib/postgresql/data
-      - ./docker/db-init-wrapper.sh:/usr/local/bin/db-init-wrapper.sh:ro
-      - type: bind
-        source: ./worklenz-backend/database/sql
-        target: /docker-entrypoint-initdb.d/sql
-        consistency: cached
-      - type: bind
-        source: ./worklenz-backend/database/migrations
-        target: /docker-entrypoint-initdb.d/migrations
-        consistency: cached
-      - type: bind
-        source: ./worklenz-backend/database/00_init.sh
-        target: /docker-entrypoint-initdb.d/00_init.sh
-        consistency: cached
-      - type: bind
-        source: ./pg_backups
-        target: /docker-entrypoint-initdb.d/pg_backups
-    command: ["/usr/local/bin/db-init-wrapper.sh"]
+
   db-backup:
     image: postgres:15
     container_name: worklenz_db_backup
@@ -110,15 +114,14 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./pg_backups:/pg_backups #host dir for backups files
-    #setup bassh loop to backup data evey 24h
+      - ./pg_backups:/pg_backups
     command: >
-           bash -c 'while true; do
-              sleep 86400;
-              PGPASSWORD=$$POSTGRES_PASSWORD pg_dump -h worklenz_db -U $$POSTGRES_USER -d $$POSTGRES_DB \
-              > /pg_backups/worklenz_db_$$(date +%Y-%m-%d_%H-%M-%S).sql;
-              find /pg_backups -type f -name "*.sql" -mtime +30 -delete;
-            done'
+      bash -c 'while true; do
+        sleep 86400;
+        PGPASSWORD=\$\$POSTGRES_PASSWORD pg_dump -h worklenz_db -U \$\$POSTGRES_USER -d \$\$POSTGRES_DB \
+        > /pg_backups/worklenz_db_\$\$(date +%Y-%m-%d_%H-%M-%S).sql;
+        find /pg_backups -type f -name "*.sql" -mtime +30 -delete;
+      done'
     restart: unless-stopped
     networks:
       - worklenz
