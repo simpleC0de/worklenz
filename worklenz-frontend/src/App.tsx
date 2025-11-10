@@ -2,6 +2,12 @@
 import React, { Suspense, useEffect, memo, useMemo, useCallback } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import i18next from 'i18next';
+import dayjs from 'dayjs';
+import 'dayjs/locale/de';
+import 'dayjs/locale/es';
+import 'dayjs/locale/pt';
+import 'dayjs/locale/zh-cn';
+import 'dayjs/locale/ko';
 
 // Components
 import ThemeWrapper from './features/theme/ThemeWrapper';
@@ -70,6 +76,18 @@ const App: React.FC = memo(() => {
     i18next.changeLanguage(lng, err => {
       if (err) return logger.error('Error changing language', err);
     });
+
+    // Update dayjs locale to match UI language
+    const localeMap: Record<string, string> = {
+      en: 'en',
+      de: 'de',
+      es: 'es',
+      pt: 'pt',
+      alb: 'en',
+      zh_cn: 'zh-cn',
+      ko: 'ko',
+    };
+    dayjs.locale(localeMap[lng] || 'en');
   }, []);
 
   // Apply theme immediately to prevent flash
