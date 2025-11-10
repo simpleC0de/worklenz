@@ -31,6 +31,7 @@ import { attachmentsApiService } from '@/api/attachments/attachments.api.service
 import logger from '@/utils/errorLogger';
 import { evt_project_files_visit } from '@/shared/worklenz-analytics-events';
 import { useMixpanelTracking } from '@/hooks/useMixpanelTracking';
+import ProjectAttachmentsGrid from './project-attachments-grid';
 
 const ProjectViewFiles = () => {
   const { t } = useTranslation('project-view-files');
@@ -39,6 +40,7 @@ const ProjectViewFiles = () => {
   const [attachments, setAttachments] = useState<IProjectAttachmentsViewModel>({});
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [viewMode, setViewMode] = useState<'listView' | 'thumbnailView'>('listView');
 
   const [paginationConfig, setPaginationConfig] = useState({
     total: 0,
@@ -231,38 +233,65 @@ const ProjectViewFiles = () => {
             {t('titleDescriptionText')}
           </Typography.Text>
 
-          <Tooltip title={t('segmentedTooltip')}>
-            <Segmented
-              options={[
-                { value: 'listView', icon: <BarsOutlined /> },
-                { value: 'thumbnailView', icon: <AppstoreOutlined /> },
-              ]}
-              defaultValue={'listView'}
-              disabled={true}
-            />
-          </Tooltip>
+          <Segmented
+            options={[
+              { value: 'listView', icon: <BarsOutlined /> },
+              { value: 'thumbnailView', icon: <AppstoreOutlined /> },
+            ]}
+            value={viewMode}
+            onChange={(value) => setViewMode(value as 'listView' | 'thumbnailView')}
+          />
         </Flex>
       }
     >
-      <Table<ITaskAttachmentViewModel>
-        className="custom-two-colors-row-table"
-        dataSource={attachments.data}
-        columns={columns}
-        rowKey={record => record.id || ''}
-        loading={loading}
-        pagination={{
-          showSizeChanger: paginationConfig.showSizeChanger,
-          defaultPageSize: paginationConfig.defaultPageSize,
-          total: paginationConfig.total,
-          current: paginationConfig.pageIndex,
-          onChange: (page, pageSize) =>
-            setPaginationConfig(prev => ({
-              ...prev,
-              pageIndex: page,
-              defaultPageSize: pageSize,
-            })),
-        }}
-      />
+      {viewMode === 'listView' ? (
+        <Table<ITaskAttachmentViewModel>
+          className="custom-two-colors-row-table"
+          dataSource={attachments.data}
+          columns={columns}
+          rowKey={record => record.id || ''}
+          loading={loading}
+          pagination={{
+            showSizeChanger: paginationConfig.showSizeChanger,
+            defaultPageSize: paginationConfig.defaultPageSize,
+            total: paginationConfig.total,
+            current: paginationConfig.pageIndex,
+            onChange: (page, pageSize) =>
+              setPaginationConfig(prev => ({
+                ...prev,
+                pageIndex: page,
+                defaultPageSize: pageSize,
+              })),
+          }}
+        />
+      ) : (
+        <>
+          <ProjectAttachmentsGrid
+            attachments={attachments.data || []}
+            onDelete={deleteAttachment}
+            onDownload={downloadAttachment}
+            downloading={downloading}
+          />
+          {attachments.data && attachments.data.length > 0 && (
+            <Flex justify="center" style={{ marginTop: 16 }}>
+              <Button
+                onClick={() =>
+                  setPaginationConfig(prev => ({
+                    ...prev,
+                    pageIndex: prev.pageIndex + 1,
+                  }))
+                }
+                disabled={
+                  !attachments.total ||
+                  paginationConfig.pageIndex * paginationConfig.defaultPageSize >= attachments.total
+                }
+              >
+                {t('loadMore') || 'Load More'}
+              </Button>
+            </Flex>
+          )}
+        </>
+      )}
     </Card>
   );
 };
